@@ -80,14 +80,6 @@ var clone = function(fn) {
     return fn.bind({});
 };
 
-var getUrl = function(result, response) {
-    if (result instanceof Error) {
-
-    } else {
-	return result;
-    }
-};
-
 if(require.main == module) {
     program
         .option('-c, --checks <check_file>', 'Path to checks.json', clone(assertFileExists), CHECKSFILE_DEFAULT)
