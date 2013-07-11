@@ -22,8 +22,10 @@ References:
 */
 
 var fs = require('fs');
+var util = require('util');
 var program = require('commander');
 var cheerio = require('cheerio');
+var rest = require('restler');
 var HTMLFILE_DEFAULT = "index.html";
 var CHECKSFILE_DEFAULT = "checks.json";
 
@@ -44,15 +46,32 @@ var loadChecks = function(checksfile) {
     return JSON.parse(fs.readFileSync(checksfile));
 };
 
-var checkHtmlFile = function(htmlfile, checksfile) {
-    $ = cheerioHtmlFile(htmlfile);
+var checkHtmlFileOrUrl = function(htmlfile, checksfile, url) {
+    if(url==undefined) {
+	$ = cheerioHtmlFile(htmlfile);
+	cheerioCheck($, checksfile);
+    }
+    else
+	rest.get(url).on('complete', function getUrl (result) {
+	    if(result instanceof Error) {
+		console.log("URL error. Exiting.");
+		process.exit(1);		
+	    } else {
+		$ = cheerio.load(result);
+		cheerioCheck($, checksfile);
+	    }
+	});
+};
+
+var cheerioCheck = function($, checksfile) {
     var checks = loadChecks(checksfile).sort();
-    var out = {};
+    var checkJson = {};
     for(var ii in checks) {
         var present = $(checks[ii]).length > 0;
-        out[checks[ii]] = present;
+        checkJson[checks[ii]] = present;
     }
-    return out;
+    var outJson = JSON.stringify(checkJson, null, 4);
+    console.log(outJson);
 };
 
 var clone = function(fn) {
@@ -61,14 +80,21 @@ var clone = function(fn) {
     return fn.bind({});
 };
 
+var getUrl = function(result, response) {
+    if (result instanceof Error) {
+
+    } else {
+	return result;
+    }
+};
+
 if(require.main == module) {
     program
         .option('-c, --checks <check_file>', 'Path to checks.json', clone(assertFileExists), CHECKSFILE_DEFAULT)
         .option('-f, --file <html_file>', 'Path to index.html', clone(assertFileExists), HTMLFILE_DEFAULT)
-        .parse(process.argv);
-    var checkJson = checkHtmlFile(program.file, program.checks);
-    var outJson = JSON.stringify(checkJson, null, 4);
-    console.log(outJson);
+        .option('-u, --url <url>', 'URL to index.html')
+	.parse(process.argv);
+    checkHtmlFileOrUrl(program.file, program.checks, program.url);
 } else {
-    exports.checkHtmlFile = checkHtmlFile;
+    exports.checkHtmlFileOrUrl = checkHtmlFileOrUrl;
 }
